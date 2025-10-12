@@ -14,13 +14,12 @@ public class Main {
                 break;
             }
 
-            if (extractCmdStrings(input)[0].equals("echo")) {
-                String message = extractCmdStrings(input)[1];
-                System.out.println(message);
-            }
+            String message = extractCmdStrings(input)[1];
+            String command = extractCmdStrings(input)[0];
 
-            else if (extractCmdStrings(input)[0].equals("type")) {
-                String message = extractCmdStrings(input)[1];
+            if (command.equals("echo")) {
+                System.out.println(message);
+            } else if (command.equals("type")) {
                 if (builtin.contains(message)) {
                     System.out.println(message + " is a shell builtin");
                 } else {
