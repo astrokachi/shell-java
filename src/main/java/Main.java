@@ -4,8 +4,8 @@ import java.util.*;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        // Uncomment this block to pass the first stage
-        Set<String> builtin = Set.of("echo", "exit", "type");
+
+        Set<String> builtin = Set.of("echo", "exit", "type", "pwd");
 
         Scanner scanner = new Scanner(System.in);
 
@@ -45,11 +45,15 @@ public class Main {
                 continue;
             }
 
+            if (command.equals("pwd")) {
+                System.out.println(System.getProperty("user.dir"));
+                continue;
+            }
+
             Path extCmd = findExecutable(command, pathEnv).orElse(null);
 
             if (extCmd != null) {
                 ProcessBuilder pb = new ProcessBuilder(splitByQuote(input));
-                // pb.directory(new File(System.getProperty("user.dir")));
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
 
