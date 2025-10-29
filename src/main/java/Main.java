@@ -57,22 +57,22 @@ public class Main {
 
             if (command.equals("cd")) {
                 Path newDirectory;
-
+                String home = System.getProperty("user.home");
                 if (arguments.isBlank()) {
-                    newDirectory = Path.of(System.getProperty("user.dir"));
+                    newDirectory = Path.of(home);
+                } else if (arguments.startsWith("~")) {
+                    String replaced = arguments.replaceFirst("~", home);
+                    newDirectory = Path.of(replaced).normalize();
                 } else {
                     Path inputPath = Path.of(arguments);
-                    if (inputPath.isAbsolute()) {
-                        newDirectory = inputPath;
-                    } else {
-                        System.out.println("Use absolute path, relative paths unavailable");
-                        continue;
-                    }
-                }
-                if (Files.exists(newDirectory) && Files.isDirectory(newDirectory)) {
-                    currentDirectory = newDirectory;
+                    newDirectory = inputPath.isAbsolute() ? inputPath : currentDirectory.resolve(inputPath).normalize();
                 }
 
+                if (Files.exists(newDirectory) && Files.isDirectory(newDirectory)) {
+                    currentDirectory = newDirectory;
+                } else {
+                    System.out.println("cd : No such file or directory " + arguments);
+                }
                 continue;
             }
 
