@@ -8,12 +8,12 @@ public class Main {
         Set<String> builtInCommands = Set.of("echo", "exit", "type", "pwd", "cd");
 
         Scanner scanner = new Scanner(System.in);
+        String pathVariable = System.getenv("PATH");
+        Path currentDirectory = Path.of(System.getProperty("user.dir"));
 
         while (true) {
-            System.out.print(System.getProperty("user.dir") + "$ ");
+            System.out.print(currentDirectory + "$ ");
             String userInput = scanner.nextLine();
-            String pathVariable = System.getenv("PATH");
-            String currentDirectory = System.getProperty("user.dir");
 
             if (userInput.isEmpty()) {
                 continue;
@@ -22,8 +22,6 @@ public class Main {
             String[] parsedInput = parseCommandAndArgs(userInput);
             String command = parsedInput[0];
             String arguments = parsedInput[1];
-
-            ProcessBuilder processBuilder = new ProcessBuilder(tokenizeCommand(userInput));
 
             // --- Built-in Commands ---
             if (command.equals("exit")) {
@@ -58,46 +56,45 @@ public class Main {
             }
 
             if (command.equals("cd")) {
-                String firstChar = (arguments != null && !arguments.isEmpty()) ? arguments.substring(0, 1) : "";
-                String homeDirectory = System.getProperty("user.home");
+                Path newDirectory;
 
-                if (firstChar.isBlank()) {
-                    System.out.println(homeDirectory);
-                }
-
-                if (firstChar.equals("/")) {
-                    String targetPath = homeDirectory + arguments;
-                    System.out.println(targetPath);
-                }
-
-                int dirDepth = arguments.split("/").length;
-                continue;
             }
 
-            // --- External Commands ---
-            Path executableCommand = locateExecutable(command, pathVariable).orElse(null);
-
-            if (executableCommand != null) {
-                processBuilder.redirectErrorStream(true);
-                Process process = processBuilder.start();
-
-                try (BufferedReader outputReader = new BufferedReader(
-                        new InputStreamReader(process.getInputStream()))) {
-                    String outputLine;
-                    while ((outputLine = outputReader.readLine()) != null) {
-                        System.out.println(outputLine);
-                    }
-
-                    process.waitFor();
-                } catch (IOException e) {
-                    System.out.println("Error running command: " + e.getMessage());
-                }
-            } else {
-                System.out.println(userInput + ": command not found");
-            }
+            // ---External Command---
+            executeExternalCommand(userInput, command, pathVariable, currentDirectory);
         }
 
         scanner.close();
+    }
+
+    static void executeExternalCommand(String userInput, String command, String pathVariable, Path currentDirectory) {
+        Optional<Path> executable = locateExecutable(command, pathVariable);
+
+        if (executable.isEmpty()) {
+            System.out.println(command + ": command not found");
+            return;
+        }
+
+        try {
+            ProcessBuilder processBuilder = new ProcessBuilder(tokenizeCommand(userInput));
+            processBuilder.directory(currentDirectory.toFile());
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            try (BufferedReader outputReader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()))) {
+                String outputLine;
+                while ((outputLine = outputReader.readLine()) != null) {
+                    System.out.println(outputLine);
+                }
+
+                process.waitFor();
+            }
+
+        } catch (IOException | InterruptedException e) {
+            System.out.println("Error running command" + e.getMessage());
+        }
+
     }
 
     // Tokenizes input while respecting quoted strings
