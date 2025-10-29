@@ -58,6 +58,22 @@ public class Main {
             if (command.equals("cd")) {
                 Path newDirectory;
 
+                if (arguments.isBlank()) {
+                    newDirectory = Path.of(System.getProperty("user.dir"));
+                } else {
+                    Path inputPath = Path.of(arguments);
+                    if (inputPath.isAbsolute()) {
+                        newDirectory = inputPath;
+                    } else {
+                        System.out.println("Use absolute path, relative paths unavailable");
+                        continue;
+                    }
+                }
+                if (Files.exists(newDirectory) && Files.isDirectory(newDirectory)) {
+                    currentDirectory = newDirectory;
+                }
+
+                continue;
             }
 
             // ---External Command---
