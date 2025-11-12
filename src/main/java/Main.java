@@ -19,9 +19,9 @@ public class Main {
                 continue;
             }
 
-            String[] parsedInput = parseCommandAndArgs(userInput);
+            String[] parsedInput = tokenizeInput(userInput);
             String command = parsedInput[0];
-            String arguments = parsedInput[1];
+            String[] arguments = Arrays.copyOfRange(parsedInput, 1, parsedInput.length);
 
             // --- Built-in Commands ---
             if (command.equals("exit")) {
@@ -29,24 +29,28 @@ public class Main {
             }
 
             if (command.equals("echo")) {
-                System.out.println(arguments);
+                System.out.println(String.join(" ", arguments));
                 continue;
             }
 
             if (command.equals("type")) {
-                Path executablePath = locateExecutable(arguments, pathVariable).orElse(null);
+                for (int i = 0; i < arguments.length; i++) {
+                    Path executablePath = locateExecutable(arguments[i], pathVariable).orElse(null);
 
-                if (builtInCommands.contains(arguments)) {
-                    System.out.println(arguments + " is a shell builtin");
+                    if (builtInCommands.contains(arguments[i])) {
+                        System.out.println(arguments + " is a shell builtin");
+                        continue;
+                    }
+
+                    if (executablePath == null) {
+                        System.out.println(arguments + ": not found");
+                        continue;
+                    }
+
+                    System.out.println(arguments + " is " + executablePath);
                     continue;
                 }
 
-                if (executablePath == null) {
-                    System.out.println(arguments + ": not found");
-                    continue;
-                }
-
-                System.out.println(arguments + " is " + executablePath);
                 continue;
             }
 
@@ -58,13 +62,13 @@ public class Main {
             if (command.equals("cd")) {
                 Path newDirectory;
                 String home = System.getProperty("user.home");
-                if (arguments.isBlank()) {
+                if (arguments.length == 0) {
                     newDirectory = Path.of(home);
-                } else if (arguments.startsWith("~")) {
-                    String replaced = arguments.replaceFirst("~", home);
+                } else if (arguments[0].startsWith("~")) {
+                    String replaced = arguments[1].replaceFirst("~", home);
                     newDirectory = Path.of(replaced).normalize();
                 } else {
-                    Path inputPath = Path.of(arguments);
+                    Path inputPath = Path.of(arguments[0]);
                     newDirectory = inputPath.isAbsolute() ? inputPath : currentDirectory.resolve(inputPath).normalize();
                 }
 
@@ -77,14 +81,15 @@ public class Main {
             }
 
             // ---External Command---
-            executeExternalCommand(userInput, command, pathVariable, currentDirectory);
+            executeExternalCommand(parsedInput, pathVariable, currentDirectory);
         }
 
         scanner.close();
     }
 
-    static void executeExternalCommand(String userInput, String command, String pathVariable, Path currentDirectory) {
-        Optional<Path> executable = locateExecutable(command, pathVariable);
+    static void executeExternalCommand(String[] parsedInput, String pathVariable, Path currentDirectory) {
+        String command = parsedInput[0];
+        Optional<Path> executable = locateExecutable(parsedInput[0], pathVariable);
 
         if (executable.isEmpty()) {
             System.out.println(command + ": command not found");
@@ -92,7 +97,7 @@ public class Main {
         }
 
         try {
-            ProcessBuilder processBuilder = new ProcessBuilder(tokenizeCommand(userInput));
+            ProcessBuilder processBuilder = new ProcessBuilder(parsedInput);
             processBuilder.directory(currentDirectory.toFile());
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
@@ -113,19 +118,49 @@ public class Main {
 
     }
 
+    enum State {
+        NORMAL,
+        IN_SINGLE_QUOTE,
+    }
+
     // Tokenizes input while respecting quoted strings
-    static String[] tokenizeCommand(String input) {
-        String[] splitByQuote = input.split("\"");
-        if (splitByQuote.length <= 1) {
-            return input.split(" ");
+    static String[] tokenizeInput(String input) {
+        State state = State.NORMAL;
+        List<String> tokens = new ArrayList<String>();
+        String currentToken = "";
+
+        for (int i = 0; i < input.length(); i++) {
+            char ch = input.charAt(i);
+
+            // echo 'this is it'
+            switch (state) {
+                case NORMAL:
+                    if (ch == '\'') { // 'hello''world'
+                        state = state.IN_SINGLE_QUOTE;
+                    } else if (Character.isWhitespace(ch)) {
+                        if (currentToken.length() > 0) {
+                            tokens.add(currentToken);
+                            currentToken = "";
+                        }
+                    } else {
+                        currentToken += ch;
+                    }
+
+                    break;
+
+                case IN_SINGLE_QUOTE:
+                    if (ch == '\'') {
+                        state = state.NORMAL;
+                    } else {
+                        currentToken += ch;
+                    }
+            }
+
+            if (i == input.length() - 1 && !currentToken.isEmpty()) {
+                tokens.add(currentToken);
+            }
+
         }
-
-        String[] preQuoteTokens = splitByQuote[0].split(" ");
-        String quotedSection = splitByQuote[1];
-
-        List<String> tokens = new ArrayList<>();
-        tokens.addAll(Arrays.asList(preQuoteTokens));
-        tokens.add(quotedSection);
 
         return tokens.toArray(new String[0]);
     }
@@ -146,17 +181,5 @@ public class Main {
         }
 
         return Optional.empty();
-    }
-
-    // Separates the command from its arguments
-    static String[] parseCommandAndArgs(String input) {
-        String[] parts = input.split(" ");
-        String command = parts[0];
-
-        String[] argsArray = new String[parts.length - 1];
-        System.arraycopy(parts, 1, argsArray, 0, parts.length - 1);
-        String arguments = String.join(" ", argsArray);
-
-        return new String[] { command, arguments };
     }
 }
